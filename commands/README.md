@@ -70,8 +70,8 @@ No settings are needed for public network queries or an explicit username.
 | `affordable [username]` | | List unowned items within the account balance |
 | `buy <id>` | | Buy an item with a default-No confirmation |
 
-Wallet queries default to the configured username. Quote memos containing spaces:
-`send user123 10.5 "Happy Birthday!"`. Amounts are parsed directly as Decimal.
+Wallet queries default to the configured username.
+`send user123 10.5 Happy Birthday!`. Amounts are parsed directly as Decimal.
 The transfer prompt defaults to No. Requests are never automatically retried by
 these commands; if a transfer result cannot be confirmed, inspect transactions
 before sending again.
