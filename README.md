@@ -20,7 +20,7 @@ You’ll need Python 3.11 or newer, an internet connection for API requests, and
 git clone https://github.com/jwestern-dev/duco-cli.git
 cd duco-cli
 py -3 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install "requests>=2.31,<3" "rich>=13,<15"
+python.exe -m pip install "requests>=2.31,<3" "rich>=13,<15"
 .\DucoCLI.cmd
 ```
 
