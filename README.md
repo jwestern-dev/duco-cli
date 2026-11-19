@@ -4,8 +4,6 @@
 
 DucoCLI is a Python command-line wallet and monitoring tool for [Duino-Coin](https://duinocoin.com/). Check your DUCO balance and transaction history, send funds, shop for items, and see how your mining rigs are performing from one terminal.
 
-**DISCLAIMER** this project is currently only compatible with Windows, a linux port will be added very soon (hopefully).
-
 ## Features
 
 - **Wallet** — Check balances and profiles, look up transactions by ID or hash, and send DUCO with a confirmation prompt.
