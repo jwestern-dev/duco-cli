@@ -42,7 +42,11 @@ from .transport import DucoTransport
 
 
 class DucoAPI:
-    """Typed client for the Duino-Coin REST API.
+    """
+    *DucoAPI Typed client for the Duino-Coin REST API.*
+
+    config DucoAPIConfig | None - Configuration to apply when creating the client.
+    transport DucoTransport | None - Existing transport to use for requests.
 
     Pass a transport to reuse a session or to test against canned responses.
     Client methods raise DucoAPIValidationError for invalid arguments and
@@ -54,7 +58,12 @@ class DucoAPI:
         config: DucoAPIConfig | None = None,
         transport: DucoTransport | None = None,
     ) -> None:
-        """Create a client, using config only when building a new transport."""
+        """
+        *__init__ Create a client, using config only when building a new transport.*
+
+        config DucoAPIConfig | None - Configuration to apply when creating the client.
+        transport DucoTransport | None - Existing transport to use for requests.
+        """
         if transport is not None:
             self._transport = transport
             return
@@ -65,12 +74,16 @@ class DucoAPI:
 
     @property
     def config(self) -> DucoAPIConfig:
-        """Return the transport's configuration."""
+        """
+        *config Return the transport's configuration.*
+        """
         return self._transport.config
 
     @property
     def transport(self) -> DucoTransport:
-        """Return the transport used by this client."""
+        """
+        *transport Return the transport used by this client.*
+        """
         return self._transport
 
     # User endpoints
@@ -79,7 +92,11 @@ class DucoAPI:
         self,
         username: str,
     ) -> User:
-        """Fetch the balance, miners and recent transactions from /users/<username>."""
+        """
+        *get_user Fetch the balance, miners and recent transactions from /users/<username>.*
+
+        username str - DUCO account name.
+        """
         username = self._validate_username(username)
 
         endpoint = f"users/{username}"
@@ -91,7 +108,11 @@ class DucoAPI:
         self,
         username: str,
     ) -> UserV3:
-        """Fetch the v3 user profile, including rates, achievements and shop items."""
+        """
+        *get_user_v3 Fetch the v3 user profile, including rates, achievements and shop items.*
+
+        username str - DUCO account name.
+        """
         username = self._validate_username(username)
 
         endpoint = f"v3/users/{username}"
@@ -102,7 +123,9 @@ class DucoAPI:
     # Balance endpoints
 
     def get_balances(self) -> dict[str, DUCOAmount]:
-        """Fetch current DUCO balances keyed by username."""
+        """
+        *get_balances Fetch current DUCO balances keyed by username.*
+        """
         endpoint = "balances"
 
         payload = self._transport.request("GET", endpoint)
@@ -113,7 +136,11 @@ class DucoAPI:
         self,
         username: str,
     ) -> UserBalance:
-        """Fetch one user's balance, stake and account details."""
+        """
+        *get_balance Fetch one user's balance, stake and account details.*
+
+        username str - DUCO account name.
+        """
         username = self._validate_username(username)
 
         endpoint = f"balances/{username}"
@@ -124,7 +151,9 @@ class DucoAPI:
     # Miner endpoints
 
     def get_miners(self) -> dict[str, list[Miner]]:
-        """Fetch active miners grouped by username."""
+        """
+        *get_miners Fetch active miners grouped by username.*
+        """
         endpoint = "miners"
 
         payload = self._transport.request("GET", endpoint)
@@ -135,7 +164,11 @@ class DucoAPI:
         self,
         username: str,
     ) -> list[Miner]:
-        """Fetch the active miners listed by /miners/<username>."""
+        """
+        *get_user_miners Fetch the active miners listed by /miners/<username>.*
+
+        username str - DUCO account name.
+        """
         username = self._validate_username(username)
 
         endpoint = f"miners/{username}"
@@ -164,7 +197,9 @@ class DucoAPI:
     # Transaction endpoints
 
     def get_transactions(self) -> dict[str, Transaction]:
-        """Fetch recent network transactions keyed by hash."""
+        """
+        *get_transactions Fetch recent network transactions keyed by hash.*
+        """
         endpoint = "transactions"
 
         payload = self._transport.request("GET", endpoint)
@@ -175,7 +210,11 @@ class DucoAPI:
         self,
         transaction_hash: str,
     ) -> Transaction:
-        """Look up a transaction by hash through /transactions/<hash>."""
+        """
+        *get_transaction Look up a transaction by hash through /transactions/<hash>.*
+
+        transaction_hash str - Hash identifying the ledger entry.
+        """
         transaction_hash = self._validate_identifier(
             transaction_hash,
             name="transaction_hash",
@@ -197,7 +236,11 @@ class DucoAPI:
         self,
         transaction_id: int,
     ) -> Transaction:
-        """Look up a transaction by its positive numeric ID."""
+        """
+        *get_transaction_by_id Look up a transaction by its positive numeric ID.*
+
+        transaction_id int - Positive numeric ledger ID.
+        """
         transaction_id = self._validate_positive_int(
             transaction_id,
             name="transaction_id",
@@ -221,7 +264,12 @@ class DucoAPI:
         *,
         limit: int = 10,
     ) -> list[Transaction]:
-        """Fetch up to limit recent transactions for a user."""
+        """
+        *get_user_transactions Fetch up to limit recent transactions for a user.*
+
+        username str - DUCO account name.
+        limit int - Maximum number of recent transactions to retrieve.
+        """
         username = self._validate_username(username)
         limit = self._validate_positive_int(
             limit,
@@ -242,12 +290,18 @@ class DucoAPI:
 
         from .parsers import parse_transaction_list
 
-        return parse_transaction_list(response.result, endpoint=endpoint)
+        transactions = parse_transaction_list(response.result, endpoint=endpoint)
+        if len(transactions) > limit:
+            # A cached upstream response can exceed the requested window.
+            transactions = sorted(transactions, key=lambda tx: tx.id)[-limit:]
+        return transactions
 
     # Pool endpoint
 
     def get_pools(self) -> list[Pool]:
-        """Fetch the visible mining pools from /all_pools."""
+        """
+        *get_pools Fetch the visible mining pools from /all_pools.*
+        """
         endpoint = "all_pools"
 
         payload = self._transport.request("GET", endpoint)
@@ -257,7 +311,9 @@ class DucoAPI:
     # Shop endpoint
 
     def get_shop_items(self) -> list[ShopItem]:
-        """Fetch the current shop catalogue."""
+        """
+        *get_shop_items Fetch the current shop catalogue.*
+        """
         endpoint = "shop_items"
 
         payload = self._transport.request("GET", endpoint)
@@ -271,7 +327,12 @@ class DucoAPI:
         username: str,
         mining_key: str,
     ) -> MiningKeyStatus:
-        """Check whether a user has a configured mining key."""
+        """
+        *check_mining_key Check whether a user has a configured mining key.*
+
+        username str - DUCO account name.
+        mining_key str - Account mining key to check.
+        """
         username = self._validate_username(username)
         mining_key = self._validate_identifier(
             mining_key,
@@ -293,7 +354,9 @@ class DucoAPI:
     # Statistics endpoint
 
     def get_statistics(self) -> Statistics:
-        """Fetch network statistics, prices and miner counts from /statistics."""
+        """
+        *get_statistics Fetch network statistics, prices and miner counts from /statistics.*
+        """
         endpoint = "statistics"
 
         payload = self._transport.request("GET", endpoint)
@@ -312,7 +375,15 @@ class DucoAPI:
         json: Any = None,
         config: DucoAPIRequestConfig | None = None,
     ) -> Any:
-        """Send a request and return the decoded JSON.
+        """
+        *request_raw Send a request and return the decoded JSON.*
+
+        method str - HTTP request method.
+        endpoint str - API route associated with the request or response.
+        params Mapping[str, Any] | None - Query parameters to send with the request.
+        data Mapping[str, Any] | None - Form fields for the request body.
+        json Any - Value to encode as a JSON request body.
+        config DucoAPIRequestConfig | None - Optional overrides for this HTTP request.
 
         Use params for query parameters, data for a form, and json for a JSON
         body. A request config can override the timeout, headers and redirects.
@@ -330,11 +401,15 @@ class DucoAPI:
     # Lifecycle
 
     def close(self) -> None:
-        """Close the transport and its HTTP session."""
+        """
+        *close Close the transport and its HTTP session.*
+        """
         self._transport.close()
 
     def __enter__(self) -> "DucoAPI":
-        """Return the client for use in a with block."""
+        """
+        *__enter__ Return the client for use in a with block.*
+        """
         return self
 
     def __exit__(
@@ -343,14 +418,24 @@ class DucoAPI:
         exc_value: BaseException | None,
         traceback: Any,
     ) -> None:
-        """Close the client when the with block ends."""
+        """
+        *__exit__ Close the client when the with block ends.*
+
+        exc_type type[BaseException] | None - Exception type supplied by the context manager.
+        exc_value BaseException | None - Exception raised inside the context, if any.
+        traceback Any - Traceback supplied when leaving the context.
+        """
         self.close()
 
     # Validation helpers
 
     @staticmethod
     def _validate_username(username: str) -> str:
-        """Strip surrounding whitespace and reject empty names or path separators."""
+        """
+        *_validate_username Strip surrounding whitespace and reject empty names or path separators.*
+
+        username str - DUCO account name.
+        """
         from .errors import DucoAPIValidationError
 
         if not isinstance(username, str):
@@ -378,7 +463,12 @@ class DucoAPI:
         *,
         name: str,
     ) -> str:
-        """Strip surrounding whitespace from a non-empty string identifier."""
+        """
+        *_validate_identifier Strip surrounding whitespace from a non-empty string identifier.*
+
+        value str - Value to validate or convert.
+        name str - Field or argument name used in validation errors.
+        """
         from .errors import DucoAPIValidationError
 
         if not isinstance(value, str):
@@ -401,7 +491,12 @@ class DucoAPI:
         *,
         name: str,
     ) -> int:
-        """Require an integer greater than zero. Booleans are invalid."""
+        """
+        *_validate_positive_int Require an integer greater than zero. Booleans are invalid.*
+
+        value int - Value to validate or convert.
+        name str - Field or argument name used in validation errors.
+        """
         from .errors import DucoAPIValidationError
 
         if isinstance(value, bool) or not isinstance(value, int):
@@ -422,7 +517,12 @@ class DucoAPI:
         *,
         endpoint: str,
     ) -> APIResponse:
-        """Unwrap the response or raise the server's reported failure."""
+        """
+        *_require_success_payload Unwrap the response or raise the server's reported failure.*
+
+        payload Any - Decoded API data to validate.
+        endpoint str - API route associated with the request or response.
+        """
         from .parsers import require_success
 
         return require_success(

@@ -3,7 +3,6 @@
 from core.commands import REGISTRY
 
 for _CATEGORY, _DESCRIPTION in {
-    "general": "General commands",
     "wallet": "Wallet commands",
     "network": "Network commands",
     "system": "System / CLI commands",

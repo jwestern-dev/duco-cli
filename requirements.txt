@@ -1,2 +1,12 @@
-requests>=2.31,<3
-rich>=13,<15
+# Tested release dependencies, including transitive packages.
+certifi==2026.11.20
+charset-normalizer==3.5.3
+idna==3.20
+markdown-it-py==4.3.0
+mdurl==0.1.2
+prompt-toolkit==3.0.53
+pygments==2.21.0
+requests==2.34.2
+rich==14.3.4
+urllib3==2.8.0
+wcwidth==0.9.5

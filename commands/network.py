@@ -6,6 +6,7 @@ from math import fsum
 from typing import Any
 
 from APISDK import Miner
+from core import runtime
 from core.commands import CommandResult, command
 from core.runtime import get_api, configured_username
 from core.ui import table_result
@@ -61,6 +62,9 @@ def rigs() -> CommandResult:
     # The user endpoint returns an empty miners list for an idle account,
     # whereas /miners/<username> returns an API failure for the same account.
     items = get_api().get_user(username).miners
+    runtime.RIG_IDENTIFIERS = tuple(dict.fromkeys(
+        value for worker in items for value in (worker.identifier, worker.threadid) if value
+    ))
     return table_result(f"Active workers for {username}",
                         ["Identifier", "Thread", "Software", "Pool", "Algorithm", "H/s", "Accepted", "Rejected"],
                         [(m.identifier, m.threadid, m.software, m.pool, m.algorithm, m.hashrate,
@@ -68,7 +72,7 @@ def rigs() -> CommandResult:
 
 
 @command(name="rig", description="Show details for a worker identifier or thread ID.",
-         category="network", example='rig "identifier"')
+         category="network", example='rig "identifier"', completers={"pos0": lambda: runtime.RIG_IDENTIFIERS})
 def rig(identifier: str) -> CommandResult:
     """
     *rig Show every worker matching a rig identifier or thread ID.*

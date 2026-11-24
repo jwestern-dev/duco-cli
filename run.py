@@ -4,7 +4,9 @@ import sys
 
 
 def launch() -> int | str | None:
-    """Run the CLI and report missing dependencies without a traceback."""
+    """
+    *launch Run the CLI and report missing dependencies without a traceback.*
+    """
     if sys.version_info < (3, 11):
         print("DucoCLI requires Python 3.11 or newer.")
         return 1
@@ -12,7 +14,8 @@ def launch() -> int | str | None:
         from core.cli import main
     except ModuleNotFoundError as exc:
         if exc.name and exc.name.split(".")[0] in {
-            "rich", "requests", "urllib3", "charset_normalizer", "certifi", "idna"
+            "rich", "requests", "urllib3", "charset_normalizer", "certifi", "idna",
+            "prompt_toolkit", "wcwidth",
         }:
             print("Dependencies are missing. Run: python -m pip install -r requirements.txt")
             return 1

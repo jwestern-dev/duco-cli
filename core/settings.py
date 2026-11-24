@@ -9,11 +9,19 @@ import tomllib
 
 
 class SettingsError(ValueError):
-    """Invalid or unreadable configuration that the CLI can report directly."""
+    """
+    *SettingsError Invalid or unreadable configuration that the CLI can report directly.*
+
+    args object - Configuration error details.
+    """
 
 
 def validate_username(value: object) -> str:
-    """Trim the username and reject placeholders, spaces and URL delimiters."""
+    """
+    *validate_username Trim the username and reject placeholders, spaces and URL delimiters.*
+
+    value object - Value to validate or convert.
+    """
     if not isinstance(value, str) or not value.strip():
         raise SettingsError("Set username in the [user] section of settings.toml.")
     value = value.strip()
@@ -28,26 +36,40 @@ def validate_username(value: object) -> str:
 
 @dataclass(frozen=True)
 class UserSettings:
-    """Account name and optional password and mining key."""
+    """
+    *UserSettings Account name and optional password.*
+
+    username str - DUCO account name.
+    password str - Wallet password, empty for a read-only profile.
+    """
     username: str
     password: str = field(default="", repr=False)
-    mining_key: str = field(default="", repr=False)
 
 
 @dataclass(frozen=True)
 class Settings:
-    """Account settings and the defaults for API calls and transaction history."""
+    """
+    *Settings Account settings and the defaults for API calls and transaction history.*
+
+    user UserSettings - Account name and optional wallet password.
+    timeout float - HTTP request timeout in seconds.
+    transaction_limit int - Default number of recent transactions to request.
+    """
     user: UserSettings
     timeout: float = 10.0
     transaction_limit: int = 10
 
 
 def validate_settings(data: object) -> Settings:
-    """Check the supported TOML tables and fill in omitted defaults."""
+    """
+    *validate_settings Check the supported TOML tables and fill in omitted defaults.*
+
+    data object - Parsed TOML document.
+    """
     if not isinstance(data, dict):
         raise SettingsError("Settings must be TOML tables.")
     allowed = {
-        "user": {"username", "password", "mining_key"},
+        "user": {"username", "password"},
         "api": {"timeout"},
         "cli": {"transaction_limit"},
     }
@@ -57,16 +79,18 @@ def validate_settings(data: object) -> Settings:
         table = data.get(section, {})
         if not isinstance(table, dict):
             raise SettingsError(f"[{section}] must be a TOML table.")
-        if set(table) - keys:
+        unknown = set(table) - keys
+        if section == "user":
+            unknown.discard("mining_key")  # Ignore the retired field in older profiles.
+        if unknown:
             raise SettingsError(
                 f"Unknown setting in [{section}]. Supported keys: {', '.join(sorted(keys))}."
             )
     user = data.get("user", {})
     username = validate_username(user.get("username"))
-    for key in ("password", "mining_key"):
-        value = user.get(key, "")
-        if not isinstance(value, str) or any(not c.isprintable() for c in value):
-            raise SettingsError(f"user.{key} must be a string without control characters.")
+    password = user.get("password", "")
+    if not isinstance(password, str):
+        raise SettingsError("user.password must be a string.")
     timeout = data.get("api", {}).get("timeout", 10.0)
     if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not 1 <= timeout <= 120:
         raise SettingsError("api.timeout must be a finite number between 1 and 120 seconds.")
@@ -74,14 +98,18 @@ def validate_settings(data: object) -> Settings:
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
         raise SettingsError("cli.transaction_limit must be an integer between 1 and 1000.")
     return Settings(
-        UserSettings(username, user.get("password", ""), user.get("mining_key", "")),
+        UserSettings(username, password),
         float(timeout),
         limit,
     )
 
 
 def load_settings(path: str | Path) -> Settings:
-    """Read and validate a settings file, accepting a UTF-8 BOM."""
+    """
+    *load_settings Read and validate a settings file, accepting a UTF-8 BOM.*
+
+    path str | Path - Path of the settings file.
+    """
     try:
         # Windows editors may prefix otherwise valid UTF-8 files with a BOM.
         data = tomllib.loads(Path(path).read_text(encoding="utf-8-sig"))
@@ -101,7 +129,12 @@ def load_settings(path: str | Path) -> Settings:
 
 
 def save_settings(path: str | Path, settings: Settings, overwrite: bool = False) -> None:
-    """Write settings atomically using a temporary file in the same directory.
+    """
+    *save_settings Write settings atomically using a temporary file in the same directory.*
+
+    path str | Path - Path of the settings file.
+    settings Settings - Validated settings to persist.
+    overwrite bool - Whether to replace an existing settings file.
 
     Replacing an existing file requires overwrite=True. Initial creation
     fails if another process has already saved the file.
@@ -112,17 +145,18 @@ def save_settings(path: str | Path, settings: Settings, overwrite: bool = False)
         "user": {
             "username": user.username,
             "password": user.password,
-            "mining_key": user.mining_key,
         },
         "api": {"timeout": settings.timeout},
         "cli": {"transaction_limit": settings.transaction_limit},
     }
     validate_settings(data)
-    content = "# DucoCLI settings. Password and mining key are stored as plain text.\n"
+    content = "# DucoCLI settings. The password is stored as plain text.\n"
     for section, values in data.items():
         content += f"\n[{section}]\n"
         for key, value in values.items():
-            content += f"{key} = {json.dumps(value, ensure_ascii=False)}\n"
+            # TOML requires an escape for DEL, which JSON leaves literal.
+            encoded = json.dumps(value, ensure_ascii=False).replace("\x7f", "\\u007f")
+            content += f"{key} = {encoded}\n"
     temporary = None
     try:
         with tempfile.NamedTemporaryFile(

@@ -1,4 +1,4 @@
-"""Inspect configuration without exposing passwords or mining keys."""
+"""Inspect configuration without exposing passwords."""
 
 from core import runtime
 from core.commands import CommandResult, command
@@ -8,7 +8,8 @@ from core.ui import table_result
 
 
 @command(name="config", description="Show masked settings, validate them, or run setup.",
-         category="config", example="config [show|check|setup]")
+         category="config", example="config [show|check|setup]",
+         completers={"pos0": lambda: ("show", "check", "setup")})
 def config(action: str = "show") -> CommandResult | None:
     """
     *config Show masked settings, verify the account, or run setup.*
@@ -36,7 +37,6 @@ def config(action: str = "show") -> CommandResult | None:
     return table_result("Configuration", ["Setting", "Value"], [
         ("Settings file", runtime.SETTINGS_PATH), ("Username", settings.user.username),
         ("Password", "Configured (hidden)" if settings.user.password else "Not set"),
-        ("Mining key", "Configured (hidden)" if settings.user.mining_key else "Not set"),
         ("API timeout (seconds)", settings.timeout), ("Transaction limit", settings.transaction_limit),
-        ("Mode", "Read-only" if runtime.READ_ONLY else "Standard"),
+        ("Mode", "Read-only" if runtime.READ_ONLY or not settings.user.password else "Standard"),
     ])

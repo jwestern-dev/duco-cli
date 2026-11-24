@@ -183,7 +183,7 @@ def affordable(username: str | None = None) -> CommandResult:
     return catalogue_table(f"Unowned items within {user}'s balance ({account.balance.balance} DUCO)", entries)
 
 
-@command(name="buy", description="Buy a shop item after confirmation.", category="shop",
+@command(name="buy", description="Buy a shop item after confirmation.", category="shop", requires_verified_user=True,
          example="shop buy <id>")
 def buy(identifier: str) -> CommandResult:
     """
@@ -216,7 +216,7 @@ def buy(identifier: str) -> CommandResult:
         Panel(summary, title=Text("Confirm purchase", style=f"bold {ACCENT}"), border_style=ACCENT)
     )
     if not Confirm.ask("Buy this item?", default=False, console=CONSOLE):
-        return CommandResult(message="Purchase cancelled.")
+        return CommandResult(ok=False, message="Purchase cancelled.")
     try:
         payload = api.request_raw(
             "GET",

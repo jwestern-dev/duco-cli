@@ -13,8 +13,8 @@ THEME = Theme(
         "duco.border": SECONDARY,
         "duco.prompt": f"bold {PRIMARY}",
         "duco.info": ACCENT,
-        "duco.success": f"bold {PRIMARY}",
+        "duco.success": "default",
         "duco.warning": f"bold {ACCENT}",
-        "duco.error": f"bold {SECONDARY}",
+        "duco.error": "bold red",
     }
 )

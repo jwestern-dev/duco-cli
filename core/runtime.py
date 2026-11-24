@@ -14,10 +14,21 @@ SETTINGS_PATH = Path(__file__).resolve().parents[1] / "settings.toml"
 _API: DucoAPI | None = None
 READ_ONLY = False
 VERIFIED_USER: UserSettings | None = None
+RIG_IDENTIFIERS: tuple[str, ...] = ()
+
+
+class RestartSession(Exception):
+    """
+    *RestartSession Return to startup after disposing of the current session.*
+
+    args object - Optional exception arguments. The shell raises this signal without arguments.
+    """
 
 
 def get_api() -> DucoAPI:
-    """Create the shared API client on the first request."""
+    """
+    *get_api Create the shared API client on the first request.*
+    """
     global _API
     if _API is None:
         timeout = load_settings(SETTINGS_PATH).timeout if SETTINGS_PATH.exists() else 10.0
@@ -26,7 +37,9 @@ def get_api() -> DucoAPI:
 
 
 def close_api() -> None:
-    """Dispose of the shared client so a later call can open a new session."""
+    """
+    *close_api Dispose of the shared client so a later call can open a new session.*
+    """
     global _API
     if _API is not None:
         api, _API = _API, None
@@ -34,23 +47,33 @@ def close_api() -> None:
 
 
 def user_settings() -> dict[str, str]:
-    """Read the current account and credentials from disk."""
+    """
+    *user_settings Read the current account and credentials from disk.*
+    """
     return asdict(load_settings(SETTINGS_PATH).user)
 
 
 def configured_username(username: str | None = None) -> str:
-    """Validate the supplied username or fall back to the configured account."""
+    """
+    *configured_username Validate the supplied username or fall back to the configured account.*
+
+    username str | None - DUCO account name.
+    """
     value = username if username is not None else user_settings().get("username")
     return validate_username(value)
 
 
 def transaction_limit() -> int:
-    """Read the configured limit for transaction history."""
+    """
+    *transaction_limit Read the configured limit for transaction history.*
+    """
     return load_settings(SETTINGS_PATH).transaction_limit if SETTINGS_PATH.exists() else 10
 
 
 def require_writes() -> UserSettings:
-    """Return the startup credentials if this session can spend DUCO."""
+    """
+    *require_writes Return the startup credentials if this session can spend DUCO.*
+    """
     if READ_ONLY:
         raise ValueError("Read-only mode: restart without --read-only to send DUCO or buy items.")
     if VERIFIED_USER is None:

@@ -1,3 +1,3 @@
 """Application version, shared by the prompt and command-line entry point."""
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"

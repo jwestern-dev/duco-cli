@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 import inspect
 from typing import Any
 
@@ -11,16 +11,24 @@ from .types import Command
 
 
 class CommandRegistry:
-    """Case-insensitive command lookup and category metadata for help."""
+    """
+    *CommandRegistry Case-insensitive command lookup and category metadata for help.*
+    """
 
     def __init__(self) -> None:
-        """Start with an empty set of commands, aliases and categories."""
+        """
+        *__init__ Start with an empty set of commands, aliases and categories.*
+        """
         self._commands_by_name: dict[str, Command] = {}
         self._alias_to_primary: dict[str, str] = {}
         self._category_descriptions: dict[str, str] = {}
 
     def register(self, command_obj: Command) -> None:
-        """Register a command after checking all its names for collisions."""
+        """
+        *register Register a command after checking all its names for collisions.*
+
+        command_obj Command - Command to add to the registry.
+        """
         primary_key = command_obj.name.lower()
 
         if primary_key in self._commands_by_name or primary_key in self._alias_to_primary:
@@ -44,7 +52,11 @@ class CommandRegistry:
             self._alias_to_primary[alias_key] = primary_key
 
     def get(self, name: str) -> Command | None:
-        """Look up a command by its name or an alias."""
+        """
+        *get Look up a command by its name or an alias.*
+
+        name str - Field or argument name used in validation errors.
+        """
         key = name.lower()
         if key in self._commands_by_name:
             return self._commands_by_name[key]
@@ -53,15 +65,21 @@ class CommandRegistry:
         return None
 
     def all(self) -> list[Command]:
-        """List each registered command once, in registration order."""
+        """
+        *all List each registered command once, in registration order.*
+        """
         return list(self._commands_by_name.values())
 
     def names(self) -> list[str]:
-        """List command names and aliases for completion."""
+        """
+        *names List command names and aliases for completion.*
+        """
         return [*self._commands_by_name.keys(), *self._alias_to_primary.keys()]
 
     def categories(self) -> dict[str, list[Command]]:
-        """Group commands for help, including categories with no commands."""
+        """
+        *categories Group commands for help, including categories with no commands.*
+        """
         grouped: dict[str, list[Command]] = {
             category: [] for category in self._category_descriptions
         }
@@ -70,11 +88,20 @@ class CommandRegistry:
         return grouped
 
     def set_category_description(self, category: str, description: str) -> None:
-        """Set the help text for a category."""
+        """
+        *set_category_description Set the help text for a category.*
+
+        category str - Command category used for help and dispatch.
+        description str - Description shown in command help.
+        """
         self._category_descriptions[category.lower()] = description.strip()
 
     def get_category_description(self, category: str) -> str:
-        """Return the category's help text, or an empty string."""
+        """
+        *get_category_description Return the category's help text, or an empty string.*
+
+        category str - Command category used for help and dispatch.
+        """
         return self._category_descriptions.get(category.lower(), "")
 
 
@@ -88,10 +115,21 @@ def command(
     example: str | None = None,
     id: int | None = None,
     category: str | None = None,
-    completers: Mapping[str, Callable[..., object]] | None = None,
+    completers: Mapping[str, Callable[..., Iterable[str]]] | None = None,
     aliases: list[str] | None = None,
+    requires_verified_user: bool = False,
 ) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
-    """Register a callback and return the original function.
+    """
+    *command Register a callback and return the original function.*
+
+    name str | None - Primary name used to invoke the command.
+    description str | None - Description shown in command help.
+    example str | None - Example invocation shown in help.
+    id int | None - Optional command identifier.
+    category str | None - Command category used for help and dispatch.
+    completers Mapping[str, Callable[..., Iterable[str]]] | None - Argument completion providers indexed by position or option group.
+    aliases list[str] | None - Alternative command names.
+    requires_verified_user bool - Whether one-shot invocation requires a verified account.
 
     The default name is the function name with underscores replaced by
     hyphens. The callback docstring supplies help text when description is
@@ -99,7 +137,11 @@ def command(
     """
 
     def wrapper(func: Callable[..., Any]) -> Callable[..., Any]:
-        """Record the callback alongside its help and completion metadata."""
+        """
+        *wrapper Record the callback alongside its help and completion metadata.*
+
+        func Callable[..., Any] - Command implementation being registered.
+        """
         signature = inspect.signature(func)
         param_names = [p.name for p in signature.parameters.values()]
 
@@ -113,6 +155,7 @@ def command(
             completers=completers or {},
             aliases=aliases or [],
             param_names=param_names,
+            requires_verified_user=requires_verified_user,
         )
         command_obj.module = func.__module__
         REGISTRY.register(command_obj)
@@ -122,5 +165,9 @@ def command(
 
 
 def register_command(command_obj: Command) -> None:
-    """Register a pre-built command in the shared registry."""
+    """
+    *register_command Register a pre-built command in the shared registry.*
+
+    command_obj Command - Command to add to the registry.
+    """
     REGISTRY.register(command_obj)

@@ -20,5 +20,5 @@ py -3 run.py %*
 :capture
 set result=%errorlevel%
 :finished
-if not "%result%"=="0" pause
+if "%~1"=="" if not "%result%"=="0" pause
 exit /b %result%

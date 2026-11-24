@@ -35,8 +35,7 @@ Imports are cached, so loading twice does not duplicate registrations.
 
 ## Account settings
 
-Copy `settings.example.toml` to `settings.toml` in the DucoCLI root and set
-`[user].username`. Set `[user].password` to enable sending. Settings are resolved
+Run `python run.py --setup` in a terminal and enter your username. Supply a wallet password to enable spending. Settings are resolved
 relative to the application directory, regardless of the current directory.
 No settings are needed for public network queries or an explicit username.
 
@@ -46,10 +45,11 @@ No settings are needed for public network queries or an explicit username.
 | --- | --- | --- |
 | `help [category] [command]` | | All commands, category help, or command help; `help balance` also works |
 | `quit` | `close`, `leave`, `shutdown`, `exit` | Close the application |
+| `restart` | | Restart the interactive session and reload the current settings file |
 | `clear` | `cls` | Clear the terminal |
 | `version` | | Application and Python versions |
 | `config [show/check/setup]` | | Masked settings, account checks and interactive setup |
-| `transactions [username]` | `gettransactions`, `listtransactions` | Recent transactions (configurable limit; default 10) |
+| `transactions [username] [--incoming/--outgoing] [--from USER] [--to USER] [--limit N]` | `gettransactions`, `listtransactions` | Filter recent entries by direction, sender or recipient. Search up to N entries (1–1000). |
 | `balance [username]` | `bal` | Balance and stake amount |
 | `profile [username]` | | Account details, verification, trust and miner limit |
 | `transaction <id-or-hash>` | | Transaction lookup; `hash:12345678` forces a numeric hash |
@@ -70,7 +70,7 @@ No settings are needed for public network queries or an explicit username.
 | `affordable [username]` | | List unowned items within the account balance |
 | `buy <id>` | | Buy an item with a default-No confirmation |
 
-Wallet queries default to the configured username.
+Wallet queries default to the configured username
 `send user123 10.5 Happy Birthday!`. Amounts are parsed directly as Decimal.
 The transfer prompt defaults to No. Requests are never automatically retried by
 these commands; if a transfer result cannot be confirmed, inspect transactions

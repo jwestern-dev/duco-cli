@@ -7,7 +7,15 @@ from typing import Any
 
 
 class DucoAPIError(Exception):
-    """Base SDK error, with request and response details when available."""
+    """
+    *DucoAPIError Base SDK error, with request and response details when available.*
+
+    message str - Message for the caller.
+    endpoint str | None - API route associated with the request or response.
+    status_code int | None - HTTP status received from the server.
+    server str | None - Server identifier reported by the API.
+    response Any - Response that supplied the error details.
+    """
 
     def __init__(
         self,
@@ -18,7 +26,15 @@ class DucoAPIError(Exception):
         server: str | None = None,
         response: Any = None,
     ) -> None:
-        """Store the message, endpoint, HTTP status, server and raw response."""
+        """
+        *__init__ Store the message, endpoint, HTTP status, server and raw response.*
+
+        message str - Message for the caller.
+        endpoint str | None - API route associated with the request or response.
+        status_code int | None - HTTP status received from the server.
+        server str | None - Server identifier reported by the API.
+        response Any - Response that supplied the error details.
+        """
         super().__init__(message)
 
         self.message = message
@@ -28,7 +44,9 @@ class DucoAPIError(Exception):
         self.response = response
 
     def __str__(self) -> str:
-        """Include the endpoint, HTTP status and server when known."""
+        """
+        *__str__ Include the endpoint, HTTP status and server when known.*
+        """
         details: list[str] = []
 
         if self.endpoint:
@@ -47,7 +65,13 @@ class DucoAPIError(Exception):
 
 
 class DucoAPIRequestError(DucoAPIError):
-    """The HTTP client could not complete the request."""
+    """
+    *DucoAPIRequestError The HTTP client could not complete the request.*
+
+    message str - Message for the caller.
+    endpoint str | None - API route associated with the request or response.
+    original_error Exception | None - Underlying transport error when explicitly supplied.
+    """
 
     def __init__(
         self,
@@ -56,7 +80,13 @@ class DucoAPIRequestError(DucoAPIError):
         endpoint: str | None = None,
         original_error: Exception | None = None,
     ) -> None:
-        """Keep the original HTTP client exception for inspection."""
+        """
+        *__init__ Keep the original HTTP client exception for inspection.*
+
+        message str - Message for the caller.
+        endpoint str | None - API route associated with the request or response.
+        original_error Exception | None - Underlying transport error when explicitly supplied.
+        """
         super().__init__(
             message,
             endpoint=endpoint,
@@ -66,7 +96,15 @@ class DucoAPIRequestError(DucoAPIError):
 
 
 class DucoAPIHTTPError(DucoAPIError):
-    """The server returned an HTTP error or a redirect the caller declined."""
+    """
+    *DucoAPIHTTPError The server returned an HTTP error or a redirect the caller declined.*
+
+    message str - Message for the caller.
+    endpoint str | None - API route associated with the request or response.
+    status_code int | None - HTTP status received from the server.
+    server str | None - Server identifier reported by the API.
+    response Any - Response that supplied the error details.
+    """
 
     def __init__(
         self,
@@ -77,7 +115,15 @@ class DucoAPIHTTPError(DucoAPIError):
         server: str | None = None,
         response: Any = None,
     ) -> None:
-        """Record the HTTP status and any response details."""
+        """
+        *__init__ Record the HTTP status and any response details.*
+
+        message str - Message for the caller.
+        endpoint str | None - API route associated with the request or response.
+        status_code int | None - HTTP status received from the server.
+        server str | None - Server identifier reported by the API.
+        response Any - Response that supplied the error details.
+        """
         super().__init__(
             message,
             endpoint=endpoint,
@@ -88,7 +134,15 @@ class DucoAPIHTTPError(DucoAPIError):
 
 
 class DucoAPIResponseError(DucoAPIError):
-    """The response could not be decoded or did not match the API schema."""
+    """
+    *DucoAPIResponseError The response could not be decoded or did not match the API schema.*
+
+    message str - Message for the caller.
+    endpoint str | None - API route associated with the request or response.
+    status_code int | None - HTTP status received from the server.
+    server str | None - Server identifier reported by the API.
+    response Any - Response that supplied the error details.
+    """
 
     def __init__(
         self,
@@ -99,7 +153,15 @@ class DucoAPIResponseError(DucoAPIError):
         server: str | None = None,
         response: Any = None,
     ) -> None:
-        """Record the response that could not be decoded or validated."""
+        """
+        *__init__ Record the response that could not be decoded or validated.*
+
+        message str - Message for the caller.
+        endpoint str | None - API route associated with the request or response.
+        status_code int | None - HTTP status received from the server.
+        server str | None - Server identifier reported by the API.
+        response Any - Response that supplied the error details.
+        """
         super().__init__(
             message,
             endpoint=endpoint,
@@ -110,7 +172,14 @@ class DucoAPIResponseError(DucoAPIError):
 
 
 class DucoAPIOperationError(DucoAPIError):
-    """The API reported success=false, often in an HTTP 200 response."""
+    """
+    *DucoAPIOperationError The API reported success=false, often in an HTTP 200 response.*
+
+    message str - Message for the caller.
+    endpoint str | None - API route associated with the request or response.
+    server str | None - Server identifier reported by the API.
+    response Any - Response that supplied the error details.
+    """
 
     def __init__(
         self,
@@ -120,7 +189,14 @@ class DucoAPIOperationError(DucoAPIError):
         server: str | None = None,
         response: Any = None,
     ) -> None:
-        """Keep the API message and the rejected response."""
+        """
+        *__init__ Keep the API message and the rejected response.*
+
+        message str - Message for the caller.
+        endpoint str | None - API route associated with the request or response.
+        server str | None - Server identifier reported by the API.
+        response Any - Response that supplied the error details.
+        """
         super().__init__(
             message,
             endpoint=endpoint,
@@ -130,12 +206,27 @@ class DucoAPIOperationError(DucoAPIError):
 
 
 class DucoAPIAuthenticationError(DucoAPIOperationError):
-    """The API rejected the account credentials."""
+    """
+    *DucoAPIAuthenticationError The API rejected the account credentials.*
+
+    message str - Message for the caller.
+    endpoint str | None - API route associated with the request or response.
+    server str | None - Server identifier reported by the API.
+    response Any - Response that supplied the error details.
+    """
 
     pass
 
 
 class DucoAPIValidationError(DucoAPIError, ValueError):
-    """Invalid SDK arguments. This is also a ValueError."""
+    """
+    *DucoAPIValidationError Invalid SDK arguments. This is also a ValueError.*
+
+    message str - Message for the caller.
+    endpoint str | None - API route associated with the request or response.
+    status_code int | None - HTTP status received from the server.
+    server str | None - Server identifier reported by the API.
+    response Any - Response that supplied the error details.
+    """
 
     pass

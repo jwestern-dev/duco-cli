@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from decimal import Decimal, InvalidOperation
+from math import isfinite
 from typing import Any, TypeVar
 
 from .errors import DucoAPIResponseError
@@ -40,7 +41,13 @@ def _error(
     endpoint: str | None = None,
     response: Any = None,
 ) -> DucoAPIResponseError:
-    """Attach the endpoint and offending value to a parser error."""
+    """
+    *_error Attach the endpoint and offending value to a parser error.*
+
+    message str - Message for the caller.
+    endpoint str | None - API route associated with the request or response.
+    response Any - Response that supplied the error details.
+    """
     return DucoAPIResponseError(
         message,
         endpoint=endpoint,
@@ -54,7 +61,13 @@ def _require_mapping(
     name: str,
     endpoint: str | None = None,
 ) -> Mapping[str, Any]:
-    """Accept a JSON object or raise a response error."""
+    """
+    *_require_mapping Accept a JSON object or raise a response error.*
+
+    value Any - Value to validate or convert.
+    name str - Field or argument name used in validation errors.
+    endpoint str | None - API route associated with the request or response.
+    """
     if not isinstance(value, Mapping):
         raise _error(
             f"Expected {name} to be an object, got "
@@ -72,7 +85,13 @@ def _require_list(
     name: str,
     endpoint: str | None = None,
 ) -> list[Any]:
-    """Accept a JSON array or raise a response error."""
+    """
+    *_require_list Accept a JSON array or raise a response error.*
+
+    value Any - Value to validate or convert.
+    name str - Field or argument name used in validation errors.
+    endpoint str | None - API route associated with the request or response.
+    """
     if not isinstance(value, list):
         raise _error(
             f"Expected {name} to be an array, got "
@@ -90,7 +109,13 @@ def _require_string(
     name: str,
     endpoint: str | None = None,
 ) -> str:
-    """Accept a string or raise a response error."""
+    """
+    *_require_string Accept a string or raise a response error.*
+
+    value Any - Value to validate or convert.
+    name str - Field or argument name used in validation errors.
+    endpoint str | None - API route associated with the request or response.
+    """
     if not isinstance(value, str):
         raise _error(
             f"Expected {name} to be a string, got "
@@ -108,7 +133,13 @@ def _require_int(
     name: str,
     endpoint: str | None = None,
 ) -> int:
-    """Accept an integer. Reject booleans even though Python treats them as ints."""
+    """
+    *_require_int Accept an integer. Reject booleans even though Python treats them as ints.*
+
+    value Any - Value to validate or convert.
+    name str - Field or argument name used in validation errors.
+    endpoint str | None - API route associated with the request or response.
+    """
     if isinstance(value, bool) or not isinstance(value, int):
         raise _error(
             f"Expected {name} to be an integer, got "
@@ -126,8 +157,14 @@ def _require_float(
     name: str,
     endpoint: str | None = None,
 ) -> float:
-    """Convert an integer or float to float. Booleans are invalid."""
-    if isinstance(value, bool) or not isinstance(value, (int, float)):
+    """
+    *_require_float Read a finite numeric field as a float, rejecting booleans.*
+
+    value Any - Value to validate or convert.
+    name str - Field or argument name used in validation errors.
+    endpoint str | None - API route associated with the request or response.
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float, Decimal)):
         raise _error(
             f"Expected {name} to be numeric, got "
             f"{type(value).__name__}",
@@ -135,7 +172,10 @@ def _require_float(
             response=value,
         )
 
-    return float(value)
+    number = float(value)
+    if not isfinite(number):
+        raise _error(f"Expected a finite number for {name}", endpoint=endpoint)
+    return number
 
 
 def _require_bool(
@@ -144,7 +184,13 @@ def _require_bool(
     name: str,
     endpoint: str | None = None,
 ) -> bool:
-    """Require a boolean field without coercing truthy values."""
+    """
+    *_require_bool Require a boolean field without coercing truthy values.*
+
+    value Any - Value to validate or convert.
+    name str - Field or argument name used in validation errors.
+    endpoint str | None - API route associated with the request or response.
+    """
     if not isinstance(value, bool):
         raise _error(
             f"Expected {name} to be a boolean, got "
@@ -162,7 +208,13 @@ def _require_field(
     *,
     endpoint: str | None = None,
 ) -> Any:
-    """Read a required key and name it in the error if missing."""
+    """
+    *_require_field Read a required key and name it in the error if missing.*
+
+    mapping Mapping[str, Any] - Object containing the required field.
+    key str - Field name to look up.
+    endpoint str | None - API route associated with the request or response.
+    """
     if key not in mapping:
         raise _error(
             f"Required response field {key!r} is missing",
@@ -179,7 +231,12 @@ def _to_decimal(
     name: str,
     endpoint: str | None = None,
 ) -> Decimal:
-    """Read a monetary or numeric field as a Decimal.
+    """
+    *_to_decimal Read a monetary or numeric field as a Decimal.*
+
+    value Any - Value to validate or convert.
+    name str - Field or argument name used in validation errors.
+    endpoint str | None - API route associated with the request or response.
 
     Convert through text to avoid carrying float representation noise into
     the Decimal.
@@ -200,13 +257,16 @@ def _to_decimal(
         )
 
     try:
-        return Decimal(str(value))
+        number = Decimal(str(value))
     except (InvalidOperation, ValueError) as exc:
         raise _error(
             f"Invalid numeric value for {name}: {value!r}",
             endpoint=endpoint,
             response=value,
         ) from exc
+    if not number.is_finite():
+        raise _error(f"Expected a finite number for {name}", endpoint=endpoint)
+    return number
 
 
 # Common API envelope
@@ -217,7 +277,11 @@ def parse_response_metadata(
     *,
     endpoint: str | None = None,
 ) -> APIResponseMetadata:
-    """Read success, server and message from a response envelope.
+    """
+    *parse_response_metadata Read success, server and message from a response envelope.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
 
     Error responses can omit the result field.
     """
@@ -263,7 +327,12 @@ def parse_api_response(
     *,
     endpoint: str | None = None,
 ) -> APIResponse:
-    """Read the common envelope and leave result in its original JSON shape."""
+    """
+    *parse_api_response Read the common envelope and leave result in its original JSON shape.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name="API response",
@@ -286,7 +355,12 @@ def require_success(
     *,
     endpoint: str | None = None,
 ) -> APIResponse:
-    """Read a successful API envelope or raise DucoAPIOperationError."""
+    """
+    *require_success Read a successful API envelope or raise DucoAPIOperationError.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     from .errors import DucoAPIOperationError
 
     response = parse_api_response(
@@ -315,7 +389,12 @@ def parse_user_balance(
     *,
     endpoint: str | None = None,
 ) -> UserBalance:
-    """Parse the balance object shared by the balance and user endpoints."""
+    """
+    *parse_user_balance Parse the balance object shared by the balance and user endpoints.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name="balance",
@@ -391,7 +470,12 @@ def parse_user(
     *,
     endpoint: str | None = None,
 ) -> User:
-    """Unpack the profile from /users/<username>."""
+    """
+    *parse_user Unpack the profile from /users/<username>.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -430,7 +514,12 @@ def parse_user_v3(
     *,
     endpoint: str | None = None,
 ) -> UserV3:
-    """Unpack the profile from /v3/users/<username>."""
+    """
+    *parse_user_v3 Unpack the profile from /v3/users/<username>.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -508,7 +597,12 @@ def parse_exchange_rate(
     *,
     endpoint: str | None = None,
 ) -> ExchangeRate:
-    """Read an exchange price and its change fields."""
+    """
+    *parse_exchange_rate Read an exchange price and its change fields.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name="exchange rate",
@@ -539,7 +633,12 @@ def parse_exchange_rates(
     *,
     endpoint: str | None = None,
 ) -> ExchangeRates:
-    """Read rates from exch_rates. Older responses can omit Bitstorage."""
+    """
+    *parse_exchange_rates Read rates from exch_rates. Older responses can omit Bitstorage.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name="exchange rates",
@@ -547,7 +646,11 @@ def parse_exchange_rates(
     )
 
     def rate(name: str) -> ExchangeRate:
-        """Read a required exchange rate by name."""
+        """
+        *rate Read a required exchange rate by name.*
+
+        name str - Field or argument name used in validation errors.
+        """
         return parse_exchange_rate(
             _require_field(mapping, name, endpoint=endpoint),
             endpoint=endpoint,
@@ -578,7 +681,12 @@ def parse_transaction(
     *,
     endpoint: str | None = None,
 ) -> Transaction:
-    """Read one ledger entry from an API object."""
+    """
+    *parse_transaction Read one ledger entry from an API object.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name="transaction",
@@ -629,7 +737,12 @@ def parse_transaction_list(
     *,
     endpoint: str | None = None,
 ) -> list[Transaction]:
-    """Read an array of ledger entries in the order returned by the API."""
+    """
+    *parse_transaction_list Read an array of ledger entries in the order returned by the API.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     values = _require_list(
         payload,
         name="transactions",
@@ -650,7 +763,12 @@ def parse_transactions(
     *,
     endpoint: str | None = None,
 ) -> dict[str, Transaction]:
-    """Read the /transactions response, whose keys are transaction hashes."""
+    """
+    *parse_transactions Read the /transactions response, whose keys are transaction hashes.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -689,7 +807,12 @@ def parse_miner(
     *,
     endpoint: str | None = None,
 ) -> Miner:
-    """Read one active worker, including its share counts and hashrate."""
+    """
+    *parse_miner Read one active worker, including its share counts and hashrate.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name="miner",
@@ -803,7 +926,12 @@ def parse_miner_list(
     *,
     endpoint: str | None = None,
 ) -> list[Miner]:
-    """Read the miners array for an account."""
+    """
+    *parse_miner_list Read the miners array for an account.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     values = _require_list(
         payload,
         name="miners",
@@ -824,7 +952,12 @@ def parse_miners(
     *,
     endpoint: str | None = None,
 ) -> dict[str, list[Miner]]:
-    """Read the /miners response, grouped by username."""
+    """
+    *parse_miners Read the /miners response, grouped by username.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -861,7 +994,12 @@ def parse_pool(
     *,
     endpoint: str | None = None,
 ) -> Pool:
-    """Read one mining pool, including its optional region."""
+    """
+    *parse_pool Read one mining pool, including its optional region.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name="pool",
@@ -922,7 +1060,12 @@ def parse_pools(
     *,
     endpoint: str | None = None,
 ) -> list[Pool]:
-    """Read the pool list returned by /all_pools."""
+    """
+    *parse_pools Read the pool list returned by /all_pools.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -952,7 +1095,13 @@ def parse_shop_item(
     *,
     endpoint: str | None = None,
 ) -> ShopItem:
-    """Read one catalogue item, using its mapping key as the item ID."""
+    """
+    *parse_shop_item Read one catalogue item, using its mapping key as the item ID.*
+
+    item_id str - Catalogue identifier for the item.
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name=f"shop item {item_id}",
@@ -1024,7 +1173,12 @@ def parse_shop_items(
     *,
     endpoint: str | None = None,
 ) -> list[ShopItem]:
-    """Read items from a mapping keyed by numeric IDs stored as strings."""
+    """
+    *parse_shop_items Read items from a mapping keyed by numeric IDs stored as strings.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -1066,7 +1220,12 @@ def parse_balance(
     *,
     endpoint: str | None = None,
 ) -> UserBalance:
-    """Unpack the /balances/<username> response."""
+    """
+    *parse_balance Unpack the /balances/<username> response.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -1083,7 +1242,12 @@ def parse_balances(
     *,
     endpoint: str | None = None,
 ) -> dict[str, Decimal]:
-    """Read the balances returned by /balances, keyed by username."""
+    """
+    *parse_balances Read the balances returned by /balances, keyed by username.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -1121,7 +1285,12 @@ def parse_mining_key_status(
     *,
     endpoint: str | None = None,
 ) -> MiningKeyStatus:
-    """Read has_key from the envelope itself. The API puts it beside success."""
+    """
+    *parse_mining_key_status Read has_key from the envelope itself. The API puts it beside success.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -1155,7 +1324,12 @@ def parse_gratka_statistics(
     *,
     endpoint: str | None = None,
 ) -> GratkaStatistics:
-    """Read the Gratka counters from network statistics."""
+    """
+    *parse_gratka_statistics Read the Gratka counters from network statistics.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name="Gratka statistics",
@@ -1186,7 +1360,12 @@ def parse_kolka_statistics(
     *,
     endpoint: str | None = None,
 ) -> KolkaStatistics:
-    """Read the Kolka counters from network statistics."""
+    """
+    *parse_kolka_statistics Read the Kolka counters from network statistics.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name="Kolka statistics",
@@ -1212,7 +1391,12 @@ def parse_miner_distribution(
     *,
     endpoint: str | None = None,
 ) -> MinerDistribution:
-    """Read the miner counts by platform."""
+    """
+    *parse_miner_distribution Read the miner counts by platform.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     mapping = _require_mapping(
         payload,
         name="miner distribution",
@@ -1220,7 +1404,11 @@ def parse_miner_distribution(
     )
 
     def integer(key: str) -> int:
-        """Read one required miner count."""
+        """
+        *integer Read one required miner count.*
+
+        key str - Field name to look up.
+        """
         return _require_int(
             _require_field(mapping, key, endpoint=endpoint),
             name=f"Miner distribution.{key}",
@@ -1246,7 +1434,11 @@ def parse_statistics(
     *,
     endpoint: str | None = None,
 ) -> Statistics:
-    """Read /statistics directly from the response body.
+    """
+    *parse_statistics Read /statistics directly from the response body.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
 
     This endpoint returns the statistics fields at the root, with no
     success or result wrapper.
@@ -1258,7 +1450,11 @@ def parse_statistics(
     )
 
     def string(key: str) -> str:
-        """Read a required text field from the statistics payload."""
+        """
+        *string Read a required text field from the statistics payload.*
+
+        key str - Field name to look up.
+        """
         return _require_string(
             _require_field(mapping, key, endpoint=endpoint),
             name=key,
@@ -1266,7 +1462,11 @@ def parse_statistics(
         )
 
     def integer(key: str) -> int:
-        """Read a required integer from the statistics payload."""
+        """
+        *integer Read a required integer from the statistics payload.*
+
+        key str - Field name to look up.
+        """
         return _require_int(
             _require_field(mapping, key, endpoint=endpoint),
             name=key,
@@ -1274,7 +1474,11 @@ def parse_statistics(
         )
 
     def numeric(key: str) -> Decimal:
-        """Read a required numeric field as a Decimal."""
+        """
+        *numeric Read a required numeric field as a Decimal.*
+
+        key str - Field name to look up.
+        """
         return _to_decimal(
             _require_field(mapping, key, endpoint=endpoint),
             name=key,
@@ -1282,6 +1486,8 @@ def parse_statistics(
         )
 
     xxhash_hashrate = _require_field(mapping, "XXHASH hashrate", endpoint=endpoint)
+    if isinstance(xxhash_hashrate, Decimal):
+        xxhash_hashrate = _require_float(xxhash_hashrate, name="XXHASH hashrate", endpoint=endpoint)
     if isinstance(xxhash_hashrate, bool) or not isinstance(
         xxhash_hashrate, (str, int, float)
     ):
@@ -1380,7 +1586,13 @@ def _parse_string_sequence(
     name: str,
     endpoint: str | None = None,
 ) -> tuple[str, ...]:
-    """Read a JSON array as a tuple of strings."""
+    """
+    *_parse_string_sequence Read a JSON array as a tuple of strings.*
+
+    payload Any - Decoded API data to validate.
+    name str - Field or argument name used in validation errors.
+    endpoint str | None - API route associated with the request or response.
+    """
     values = _require_list(
         payload,
         name=name,
@@ -1402,7 +1614,12 @@ def parse_user_miners(
     *,
     endpoint: str | None = None,
 ) -> list[Miner]:
-    """Unpack the worker list from /miners/<username>."""
+    """
+    *parse_user_miners Unpack the worker list from /miners/<username>.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -1419,7 +1636,12 @@ def parse_transaction_response(
     *,
     endpoint: str | None = None,
 ) -> Transaction:
-    """Unpack a single transaction found by ID or hash."""
+    """
+    *parse_transaction_response Unpack a single transaction found by ID or hash.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -1436,7 +1658,12 @@ def parse_user_transactions(
     *,
     endpoint: str | None = None,
 ) -> list[Transaction]:
-    """Unpack the list returned by /user_transactions/<username>."""
+    """
+    *parse_user_transactions Unpack the list returned by /user_transactions/<username>.*
+
+    payload Any - Decoded API data to validate.
+    endpoint str | None - API route associated with the request or response.
+    """
     response = require_success(
         payload,
         endpoint=endpoint,
@@ -1452,7 +1679,12 @@ def get_user_miners(
     self,
     username: str,
 ) -> list[Miner]:
-    """Fetch and parse the worker list for a user."""
+    """
+    *get_user_miners Fetch and parse the worker list for a user.*
+
+    self DucoAPI - Client supplying the transport and request validation.
+    username str - DUCO account name.
+    """
     username = self._validate_username(username)
 
     endpoint = f"miners/{username}"
@@ -1472,7 +1704,12 @@ def get_transaction(
     self,
     transaction_hash: str,
 ) -> Transaction:
-    """Fetch and parse one transaction by its hash."""
+    """
+    *get_transaction Fetch and parse one transaction by its hash.*
+
+    self DucoAPI - Client supplying the transport and request validation.
+    transaction_hash str - Hash identifying the ledger entry.
+    """
     transaction_hash = self._validate_identifier(
         transaction_hash,
         name="transaction_hash",
@@ -1495,7 +1732,12 @@ def get_transaction_by_id(
     self,
     transaction_id: int,
 ) -> Transaction:
-    """Fetch and parse one transaction by ID."""
+    """
+    *get_transaction_by_id Fetch and parse one transaction by ID.*
+
+    self DucoAPI - Client supplying the transport and request validation.
+    transaction_id int - Positive numeric ledger ID.
+    """
     transaction_id = self._validate_positive_int(
         transaction_id,
         name="transaction_id",
@@ -1520,7 +1762,13 @@ def get_user_transactions(
     *,
     limit: int = 10,
 ) -> list[Transaction]:
-    """Fetch and parse recent transactions for a user."""
+    """
+    *get_user_transactions Fetch and parse recent transactions for a user.*
+
+    self DucoAPI - Client supplying the transport and request validation.
+    username str - DUCO account name.
+    limit int - Maximum number of recent transactions to retrieve.
+    """
     username = self._validate_username(username)
 
     limit = self._validate_positive_int(

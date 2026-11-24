@@ -1,5 +1,6 @@
 """Wallet queries and explicitly confirmed transfers."""
 
+import argparse
 from dataclasses import fields
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -13,23 +14,99 @@ from APISDK.errors import DucoAPIError, DucoAPIHTTPError, DucoAPIOperationError
 from APISDK.parsers import require_success
 from core.commands import CommandResult, command
 from core.runtime import CONSOLE, configured_username, get_api, require_writes, transaction_limit
+from core.settings import validate_username
 from core.theme import ACCENT
 from core.ui import format_decimal, plain_html, table_result
 
 
+class FilterParser(argparse.ArgumentParser):
+    """
+    *FilterParser Report transaction filter errors through the command result handler.*
+
+    prog str | None - Program name shown in usage text.
+    usage str | None - Override for the generated usage line.
+    description str | None - Text displayed before the argument descriptions.
+    epilog str | None - Text displayed after the argument descriptions.
+    parents Sequence[ArgumentParser] - Parsers supplying shared arguments.
+    formatter_class type[HelpFormatter] - Formatter for usage and help.
+    prefix_chars str - Characters that introduce optional arguments.
+    fromfile_prefix_chars str | None - Prefixes for files containing arguments.
+    argument_default object - Default used for arguments without an explicit default.
+    conflict_handler str - Policy for conflicting option names.
+    add_help bool - Whether to register the standard help option.
+    allow_abbrev bool - Whether unambiguous long-option prefixes are accepted.
+    exit_on_error bool - Standard argparse policy for parse errors.
+
+    Construction follows argparse.ArgumentParser on the running Python version.
+    """
+
+    def error(self, message):
+        """
+        *error Raise a command error instead of exiting the shell on invalid filters.*
+
+        message str - Message for the caller.
+        """
+        raise ValueError(f"Transaction filters: {message}")
+
+
+TRANSACTION_FILTERS = FilterParser(prog="transactions", add_help=False, allow_abbrev=False)
+TRANSACTION_FILTERS.add_argument("username", nargs="?")
+DIRECTION_OPTIONS = TRANSACTION_FILTERS.add_mutually_exclusive_group()
+DIRECTION_OPTIONS.add_argument("--incoming", action="store_true")
+DIRECTION_OPTIONS.add_argument("--outgoing", action="store_true")
+TRANSACTION_FILTERS.add_argument("--from", dest="sender", type=validate_username)
+TRANSACTION_FILTERS.add_argument("--to", dest="recipient", type=validate_username)
+TRANSACTION_FILTERS.add_argument("--limit", type=int)
+
+
+def available_filters(arguments: list[str]) -> set[str]:
+    """
+    *available_filters Suggest unused filter flags that are valid after the current arguments.*
+
+    arguments list[str] - Transaction history arguments supplied so far.
+    """
+    takes_value = {"--from", "--to", "--limit"}
+    if arguments and arguments[-1] in takes_value:
+        return set()
+    available = takes_value.difference(arguments)
+    if not {"--incoming", "--outgoing"}.intersection(arguments):
+        available.update(("--incoming", "--outgoing"))
+    return available
+
+
 @command(name="transactions", description="List user transactions.", category="wallet",
-         example="transactions [username]", aliases=["gettransactions", "listtransactions"])
-def transactions(username: str | None = None) -> CommandResult:
+         example="transactions [username] [--incoming|--outgoing] [--from USER] [--to USER] [--limit N]",
+         aliases=["gettransactions", "listtransactions"],
+         completers={"options": available_filters})
+def transactions(*arguments: str, username: str | None = None) -> CommandResult:
     """
     *transactions List recent transactions for the requested account.*
 
+    arguments str - Transaction history arguments supplied so far.
     username str | None - Account to look up, defaulting to the configured username.
     """
-    user = configured_username(username)
-    items = get_api().get_user_transactions(user, limit=transaction_limit())
-    return table_result(f"Recent transactions for {user}",
-                        ["ID", "Date (UTC)", "Sender", "Recipient", "DUCO", "Memo", "Hash"],
-                        [(t.id, t.datetime, t.sender, t.recipient, t.amount, t.memo, t.hash) for t in items])
+    options = TRANSACTION_FILTERS.parse_args(arguments)
+    user = configured_username(options.username or username)
+    limit = transaction_limit() if options.limit is None else options.limit
+    if not 1 <= limit <= 1000:
+        raise ValueError("--limit must be between 1 and 1000.")
+    items = get_api().get_user_transactions(user, limit=limit)
+    matches = [
+        entry for entry in items
+        if (not options.incoming or entry.recipient.casefold() == user.casefold())
+        and (not options.outgoing or entry.sender.casefold() == user.casefold())
+        and (not options.sender or entry.sender.casefold() == options.sender.casefold())
+        and (not options.recipient or entry.recipient.casefold() == options.recipient.casefold())
+    ]
+    counts = f"{len(matches)} matched, {len(items)} searched"
+    if len(items) < limit:
+        counts += f", {limit} requested"
+    return table_result(
+        f"Recent transactions for {user} ({counts})",
+        ["ID", "Date (UTC)", "Sender", "Recipient", "DUCO", "Memo", "Hash"],
+        [(entry.id, entry.datetime, entry.sender, entry.recipient, entry.amount, entry.memo, entry.hash)
+         for entry in matches],
+    )
 
 
 @command(name="balance", description="Get user balance.", category="wallet",
@@ -48,7 +125,7 @@ def balance(username: str | None = None) -> CommandResult:
 
 
 @command(name="send", description="Send DUCO to another user.", category="wallet",
-         example='send user123 10.5 "Happy Birthday!"')
+         example='send user123 10.5 "Happy Birthday!"', requires_verified_user=True)
 def send(username: str, amount: str, memo: str = "None") -> CommandResult:
     """
     *send Confirm and submit a transfer from the verified session account.*
@@ -65,6 +142,11 @@ def send(username: str, amount: str, memo: str = "None") -> CommandResult:
         raise ValueError("Amount must be a positive finite number.") from None
     if not value.is_finite() or value <= 0:
         raise ValueError("Amount must be a positive finite number.")
+    # Bound fixed-point expansion before allocating the preview or request string.
+    integer_digits = max(1, value.adjusted() + 1)
+    fraction_digits = max(0, -value.as_tuple().exponent)
+    if integer_digits + fraction_digits > 128:
+        raise ValueError("Amount must fit within 128 digits in decimal notation.")
     recipient = configured_username(username)
     amount_text = format(value, "f")
     summary = Text(
@@ -78,7 +160,7 @@ def send(username: str, amount: str, memo: str = "None") -> CommandResult:
         Panel(summary, title=Text("Confirm transfer", style=f"bold {ACCENT}"), border_style=ACCENT)
     )
     if not Confirm.ask("Send this transfer?", default=False, console=CONSOLE):
-        return CommandResult(message="Transfer cancelled.")
+        return CommandResult(ok=False, message="Transfer cancelled.")
     try:
         payload = get_api().request_raw(
             "GET",
